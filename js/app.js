@@ -28,6 +28,39 @@ addEventListener('api-slow', e => {
 });
 onAuthLost = () => { me = null; authView('login', 'Your session expired. Please sign in again.') };
 
+/* ---------------- landing ---------------- */
+function landing() {
+  app.innerHTML = `<div class="land">
+    <div class="land-hero">
+      <div class="land-logo"><i>R</i>Resolve</div>
+      <h1>Every customer complaint, tracked to resolution.</h1>
+      <p class="land-lead">A secure ticketing platform for banks and fintechs: log issues, route them to the right team and keep a full audit trail — from the first report to a verified resolution.</p>
+      <div class="land-cta">
+        <button class="btn primary block" id="l-signup" style="max-width:220px">Sign up</button>
+        <button class="btn alt block" id="l-login" style="max-width:220px">Sign in</button>
+      </div>
+      <p class="land-small">Already have an account? <a href="#" id="l-login2">Sign in</a></p>
+    </div>
+    <div class="land-grid">
+      <div class="land-card"><div class="land-icon">💬</div><h3>File a ticket in seconds</h3><p>Customers describe what happened, pick a category and attach screenshots or a PDF statement. No forms to hunt through.</p></div>
+      <div class="land-card"><div class="land-icon">🧭</div><h3>Smart triage &amp; routing</h3><p>Tickets are sorted into department queues and matched against category rules, so the right team sees them first — every time.</p></div>
+      <div class="land-card"><div class="land-icon">⏱️</div><h3>SLA-friendly workflows</h3><p>Track priority, status changes and assignees. Heads of department can claim, assign, transfer and resolve, with a full activity log.</p></div>
+      <div class="land-card"><div class="land-icon">🔒</div><h3>Audit trail &amp; attachments</h3><p>Every comment, status change and transfer is timestamped and attributed. Private internal notes stay hidden from customers; files are downloadable and deletable.</p></div>
+      <div class="land-card"><div class="land-icon">👥</div><h3>Role-based access</h3><p>Separate experiences for complainants, agents and admins. Department members only see their own queue; administrators manage users, departments and categories.</p></div>
+      <div class="land-card"><div class="land-icon">🛡️</div><h3>Built for reliability</h3><p>Rate-limited endpoints, expired-session recovery, two-step verification for logins and a wake-up banner when the API server is sleeping.</p></div>
+    </div>
+    <div class="land-foot">
+      <div class="land-logo"><i>R</i>Resolve</div>
+      <p>Complaint &amp; ticket management for banks and fintechs.</p>
+      <p class="land-small">© ${new Date().getFullYear()} Resolve · <a href="#" id="l-login3">Sign in</a></p>
+    </div>
+  </div>`;
+  $('#l-signup').onclick = e => { e.preventDefault(); authView('register') };
+  $('#l-login').onclick = e => { e.preventDefault(); authView() };
+  $('#l-login2').onclick = e => { e.preventDefault(); authView() };
+  $('#l-login3').onclick = e => { e.preventDefault(); authView() };
+}
+
 /* ---------------- auth ---------------- */
 function authFrame(inner) {
   app.innerHTML = `<div class="authwrap"><div class="hero"><div class="logo"><i>R</i>Resolve</div>
@@ -388,7 +421,8 @@ async function members(id, name) {
 
 /* ---------------- router ---------------- */
 function route() {
-  if (!me) return; nav++;
+  if (!me) { if (!location.hash) return landing(); return; }
+  nav++;
   const h = location.hash || (isStaff() ? '#/tickets' : '#/mine'), m = h.match(/^#\/t\/(\d+)/);
   if (m) return detail(+m[1]);
   const adminOnly = ['#/intake', '#/users', '#/depts', '#/cats'], staffOnly = ['#/tickets', '#/queues'];
@@ -397,7 +431,7 @@ function route() {
   (R[h] || (() => location.hash = isStaff() ? '#/tickets' : '#/mine'))();
 }
 async function boot() {
-  if (!tok.a && !tok.r) return authView();
+  if (!tok.a && !tok.r) return landing();
   app.innerHTML = '<div class="authwrap"><div class="auth"><div class="logo"><i>R</i>Resolve</div>' + skel(3) + '</div></div>';
   try { me = await api('/auth/me'); route() } catch (e) { tok.clear(); authView('login', e.status === 401 ? '' : e.message) }
 }
