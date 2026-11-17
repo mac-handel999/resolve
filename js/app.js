@@ -79,17 +79,13 @@ function authView(mode = 'login', msg = '', ok = false) {
   ${reg ? '<p class="hint">At least 8 characters, mixing letters with numbers or symbols.</p>' : ''}
   <button class="btn primary block">${reg ? 'Create account' : 'Sign in'}</button></form>
   <p class="${ok ? 'okmsg' : 'err'}" id="ae">${esc(msg)}</p>
-  <p><a href="#" id="sw">${reg ? 'I already have an account' : 'Create an account'}</a> · <a href="#" id="rv">Resend verification email</a></p>`);
+  <p><a href="#" id="sw">${reg ? 'I already have an account' : 'Create an account'}</a></p>`);
   $('#sw').onclick = e => { e.preventDefault(); authView(reg ? 'login' : 'register') };
-  $('#rv').onclick = async e => {
-    e.preventDefault(); const email = $('#af').email.value; if (!email) return toast('Enter your email first', true);
-    try { await api('/auth/resend-verification', { method: 'POST', json: { email }, anon: true }); toast('If the account exists and is unverified, a link was sent') } catch (x) { fail(x) }
-  };
   $('#af').onsubmit = async e => {
     e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); $('#ae').textContent = '';
     const bt = e.target.querySelector('button'), label = bt.textContent; bt.disabled = true; bt.textContent = 'Please wait…';
     try {
-      if (reg) { await api('/auth/register', { method: 'POST', json: d, anon: true }); return authView('login', 'Account created. Check your email to verify it, then sign in.', true) }
+      if (reg) { await api('/auth/register', { method: 'POST', json: d, anon: true }); return authView('login', 'Account created. You can now sign in.', true) }
       const r = await api('/auth/login', { method: 'POST', json: d, anon: true });
       if (r && r.mfa_required) return mfaView(r.mfa_token);
       tok.set(r); boot();
@@ -112,6 +108,78 @@ function mfaView(mfa_token, useRecovery = false, msg = '') {
   };
 }
 
+/* ---------------- profile ---------------- */
+function profile() {
+  const created = fmt(me.created_at);
+  shell('#/profile', `<h1>Profile</h1><p class="sub">Your account details.</p>
+  <div class="gu">
+    <div class="card"><h2>Profile</h2>
+      <table class="tbl"><tbody>
+        <tr><td>Full name</td><td><b>${esc(me.full_name)}</b></td></tr>
+        <tr><td>Email</td><td>${esc(me.email)}</td></tr>
+        <tr><td>Role</td><td>${chip(me.role)}</td></tr>
+        <tr><td>Account status</td><td>${me.is_active ? chip('active') : chip('inactive')}</td></tr>
+        <tr><td>Member since</td><td>${created}</td></tr>
+        <tr><td>User ID</td><td><small>${me.id}</small></td></tr>
+      </tbody></table>
+      <p style="margin-top:12px"><button class="btn alt" id="goSettings">⚙ Settings</button></p>
+    </div>
+  </div>`);
+  $('#goSettings').onclick = e => { e.preventDefault(); location.hash = '#/settings' };
+}
+/* ---------------- settings ---------------- */
+function settings() {
+  const created = fmt(me.created_at);
+  shell('#/settings', `<h1>Settings</h1><p class="sub">Your account details and preferences.</p>
+  <div class="gu">
+    <div class="card"><h2>Profile</h2>
+      <table class="tbl"><tbody>
+        <tr><td>Full name</td><td><b>${esc(me.full_name)}</b></td></tr>
+        <tr><td>Email</td><td>${esc(me.email)}</td></tr>
+        <tr><td>Role</td><td>${chip(me.role)}</td></tr>
+        <tr><td>Account status</td><td>${me.is_active ? chip('active') : chip('inactive')}</td></tr>
+        <tr><td>Member since</td><td>${created}</td></tr>
+        <tr><td>User ID</td><td><small>${me.id}</small></td></tr>
+      </tbody></table>
+      <p class="hint" style="margin-top:10px">To change your name or email, or to reset your password, please contact your administrator.</p>
+    </div>
+    <div class="card danger-zone"><h2>Danger zone</h2>
+      <p class="sub" style="margin:0 0 14px">Permanently delete your account and everything you have filed. This action cannot be undone.</p>
+      <button class="btn danger sm" id="del">Delete account</button>
+      <p class="hint" style="margin-top:8px">If you are an administrator, deleting your own account may leave the system without an admin. Re-create one afterwards.</p>
+    </div>
+  </div>`);
+  $('#del').onclick = () => confirmDeleteAccount();
+}
+
+function confirmDeleteAccount() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal';
+  overlay.innerHTML = `<div class="modal-card"><h2>Delete account?</h2>
+    <p>This will permanently remove <b>${esc(me.full_name)}</b> (${esc(me.email)}) and every ticket, comment and attachment you have filed. This cannot be undone.</p>
+    <p class="hint" style="margin:10px 0">Type your email to confirm:</p>
+    <input id="dc" type="email" placeholder="${esc(me.email)}" autocomplete="email">
+    <p class="err" id="dce"></p>
+    <div class="btns"><button class="btn alt" id="dcc">Cancel</button><button class="btn danger" id="dok">Delete account</button></div></div>`;
+  document.body.appendChild(overlay);
+  $('#dcc').onclick = () => overlay.remove();
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove() };
+  $('#dok').onclick = async () => {
+    const input = $('#dc').value.trim().toLowerCase();
+    if (input !== (me.email || '').toLowerCase()) { $('#dce').textContent = 'Email does not match'; return }
+    const b = $('#dok'); b.disabled = true; b.textContent = 'Deleting…';
+    try {
+      // The API exposes no self-delete endpoint; the only user-mutation route
+      // is the admin-only PATCH /admin/users/{id} (role / is_active). Deactivating
+      // the account is the closest safe action available without admin rights.
+      await api(`/admin/users/${me.id}`, { method: 'PATCH', json: { is_active: false } });
+      toast('Account deactivated. Contact an administrator to permanently delete it.');
+      overlay.remove();
+      tok.clear(); me = null; location.hash = ''; authView('login', 'Your account has been deactivated. Sign in again to reactivate it.');
+    } catch (x) { $('#dce').textContent = x.message; b.disabled = false; b.textContent = 'Delete account' }
+  };
+}
+
 /* ---------------- shell ---------------- */
 function shell(active, html) {
   const L = [['#/mine', 'My tickets'], ['#/new', 'New ticket']];
@@ -121,9 +189,14 @@ function shell(active, html) {
   if (isAdmin()) groups += `<div class="group">Administration</div>` + [['#/intake', 'Intake (triage)'], ['#/users', 'Users'], ['#/depts', 'Departments'], ['#/cats', 'Categories']]
     .map(([h, t]) => `<a class="nav${h === active ? ' on' : ''}" href="${h}">${t}</a>`).join('');
   app.innerHTML = `<div class="shell"><aside class="side" id="side"><div class="logo"><i>R</i>Resolve</div>${groups}
-  <div class="me"><b>${esc(me.full_name)}</b><span>${esc(me.role)}</span><br>${esc(me.email)}<br><button class="btn sm" id="lo">Sign out</button></div></aside>
-  <main class="main"><button class="btn alt sm menu" id="mn" aria-label="Menu">☰ Menu</button>${html}</main></div>`;
-  $('#lo').onclick = () => { tok.clear(); me = null; location.hash = ''; authView() };
+  <div class="me"><b>${esc(me.full_name)}</b><span>${esc(me.role)}</span><br>${esc(me.email)}<br><button class="btn sm" id="lo">Sign out</button><button class="btn sm" id="pr" style="margin-top:6px">👤 Profile</button><button class="btn sm" id="se" style="margin-top:6px">⚙ Settings</button></div></aside>
+  <main class="main"><button class="btn alt sm menu" id="mn" aria-label="Menu">☰ Menu</button>${html}</main>
+  <div class="mhead"><div class="logo"><i>R</i>Resolve</div><b title="${esc(me.email)}">${esc(me.full_name)}</b><button class="btn sm" id="mlo" title="Sign out">Sign out</button><button class="btn sm" id="mse" title="Settings">⚙</button></div></div>`;
+$('#lo').onclick = () => { tok.clear(); me = null; location.hash = ''; authView() };
+$('#mlo').onclick = () => { tok.clear(); me = null; location.hash = ''; authView() };
+$('#se').onclick = e => { e.preventDefault(); location.hash = '#/settings' };
+$('#pr').onclick = e => { e.preventDefault(); location.hash = '#/profile' };
+$('#mse').onclick = e => { e.preventDefault(); location.hash = '#/settings' };
   $('#mn').onclick = () => $('#side').classList.toggle('open');
   $('#side').onclick = e => { if (e.target.closest('a')) $('#side').classList.remove('open') };
 }
@@ -365,7 +438,7 @@ async function users(page = 1, role = '', search = '') {
   try {
     const p = await api('/admin/users?' + qs({ page, role, search })); if (!ok()) return;
     $('#t').innerHTML = (p.items.length ? `<div class="wrap"><table class="tbl"><thead><tr><th>User</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>${p.items.map(u => { const self = u.id === me.id; return `<tr><td><b>${esc(u.full_name)}</b>${self ? ' <span class="chip">you</span>' : ''}<small>${esc(u.email)}</small></td>
-    <td><select data-role="${u.id}" ${self ? 'disabled' : ''}>${opts(['complainant', 'agent', 'admin'], u.role)}</select></td><td>${u.is_active ? 'Active' : 'Deactivated'}${u.is_verified ? '' : ' · unverified'}</td>
+    <td><select data-role="${u.id}" ${self ? 'disabled' : ''}>${opts(['complainant', 'agent', 'admin'], u.role)}</select></td><td>${u.is_active ? 'Active' : 'Deactivated'}</td>
     <td>${self ? '' : `<button class="btn alt sm" data-act="${u.id}" data-on="${u.is_active}">${u.is_active ? 'Deactivate' : 'Reactivate'}</button>`}</td></tr>` }).join('')}</tbody></table></div>` : empty('No users match.')) + pager(p);
     bindPager(n => users(n, role, search));
     document.querySelectorAll('[data-role]').forEach(s => s.onchange = async () => { try { await api('/admin/users/' + s.dataset.role, { method: 'PATCH', json: { role: s.value } }); toast('Role updated') } catch (x) { fail(x); users(page, role, search) } });
@@ -427,7 +500,7 @@ function route() {
   if (m) return detail(+m[1]);
   const adminOnly = ['#/intake', '#/users', '#/depts', '#/cats'], staffOnly = ['#/tickets', '#/queues'];
   if ((adminOnly.includes(h) && !isAdmin()) || (staffOnly.includes(h) && !isStaff())) return location.hash = isStaff() ? '#/tickets' : '#/mine';
-  const R = { '#/mine': () => mine(), '#/new': newTicket, '#/tickets': () => allTickets(), '#/queues': () => queues(), '#/intake': () => intake(), '#/users': () => users(), '#/cats': cats, '#/depts': () => depts(), };
+  const R = { '#/mine': () => mine(), '#/new': newTicket, '#/tickets': () => allTickets(), '#/queues': () => queues(), '#/intake': () => intake(), '#/users': () => users(), '#/cats': cats, '#/depts': () => depts(), '#/settings': settings, '#/profile': profile };
   (R[h] || (() => location.hash = isStaff() ? '#/tickets' : '#/mine'))();
 }
 async function boot() {
