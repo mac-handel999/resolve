@@ -189,15 +189,18 @@ function shell(active, html) {
   if (isAdmin()) groups += `<div class="group">Administration</div>` + [['#/intake', 'Intake (triage)'], ['#/users', 'Users'], ['#/depts', 'Departments'], ['#/cats', 'Categories']]
     .map(([h, t]) => `<a class="nav${h === active ? ' on' : ''}" href="${h}">${t}</a>`).join('');
   app.innerHTML = `<div class="shell"><aside class="side" id="side"><div class="logo"><i>R</i>Resolve</div>${groups}
-  <div class="me"><b>${esc(me.full_name)}</b><span>${esc(me.role)}</span><br>${esc(me.email)}<br><button class="btn sm" id="lo">Sign out</button><button class="btn sm" id="pr" style="margin-top:6px">👤 Profile</button><button class="btn sm" id="se" style="margin-top:6px">⚙ Settings</button></div></aside>
+  <div class="me"><b>${esc(me.full_name)}</b><span>${esc(me.role)}</span><br>${esc(me.email)}<br><button class="btn sm" id="lo">Sign out</button><button class="btn sm" id="pr" style="margin-top:6px">👤 Profile</button><button class="btn sm" id="se" style="margin-top:6px">⚙ Settings</button><button class="btn sm" id="tm" style="margin-top:6px">🌓 Theme</button></div></aside>
   <main class="main"><button class="btn alt sm menu" id="mn" aria-label="Menu">☰ Menu</button>${html}</main>
+  <nav class="mfoot"><a href="#/mine">🏠<br>My</a><a href="#/new">➕<br>New</a>${isStaff()?'<a href="#/tickets">📋<br>All</a><a href="#/queues">📥<br>Queue</a>':''}<a href="#/profile">👤<br>Profile</a></nav>
   <div class="mhead"><div class="logo"><i>R</i>Resolve</div><b title="${esc(me.email)}">${esc(me.full_name)}</b><button class="btn sm" id="mlo" title="Sign out">Sign out</button><button class="btn sm" id="mse" title="Settings">⚙</button></div></div>`;
 $('#lo').onclick = () => { tok.clear(); me = null; location.hash = ''; authView() };
 $('#mlo').onclick = () => { tok.clear(); me = null; location.hash = ''; authView() };
 $('#se').onclick = e => { e.preventDefault(); location.hash = '#/settings' };
 $('#pr').onclick = e => { e.preventDefault(); location.hash = '#/profile' };
 $('#mse').onclick = e => { e.preventDefault(); location.hash = '#/settings' };
-  $('#mn').onclick = () => $('#side').classList.toggle('open');
+$('#mn').onclick = () => $('#side').classList.toggle('open');
+$('#tm').onclick = () => { document.body.classList.toggle('dark'); localStorage.setItem('theme', document.body.classList.contains('dark')?'dark':'light'); };
+if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark');
   $('#side').onclick = e => { if (e.target.closest('a')) $('#side').classList.remove('open') };
 }
 const pager = p => `<div class="pager"><button class="btn alt sm" ${p.page <= 1 ? 'disabled' : ''} data-pg="${p.page - 1}">Previous</button>

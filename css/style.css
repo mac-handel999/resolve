@@ -130,3 +130,8 @@ form .btn{margin-top:12px}.hint{font-size:12px;color:var(--mute);margin-top:4px}
  .authwrap{grid-template-columns:1fr}.hero{display:none}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+body.dark{--bg:#0b1220;--card:#111a2e;--text:#e6edf3;--muted:#9aa4b2;--border:#1f2a44;background:var(--bg);color:var(--text)}
+body.dark .card{background:var(--card);border-color:var(--border)}
+.mfoot{display:none}
+@media(max-width:768px){.mfoot{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--card,#fff);border-top:1px solid var(--border,#ddd);justify-content:space-around;padding:6px 0;z-index:50;font-size:11px;text-align:center}.mfoot a{text-decoration:none;color:inherit}}
